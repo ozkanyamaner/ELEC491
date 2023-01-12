@@ -138,17 +138,15 @@ def return_ready_files(path):
 def generate_response(furhat, predictions):
     if 1 in predictions:
         furhat.gesture(name="Surprise")
+        furhat.say(url="file:///home/ozkan/Desktop/ELEC491/bellring_short.wav", lipsync=False)
 
 def play_video(filename):
-        opener = "xdg-open"
+        opener = "xdg-open"               
         subprocess.call([opener, filename])
-        #os.system(f'{opener} {filename}')
 
+def consume_wav_files(path, stop, args, reader, model, furhat):
 
-def consume_wav_files(path, stop, args, reader, model):
-
-    furhat = FurhatRemoteAPI("localhost")
-    #furhat = FurhatRemoteAPI("192.168.137.1")
+    
     # Continuously look for new .wav files in the folder
     rest = None # Unprocessed segment of the wav file
     shift = 10 # Amount of shift in windows during processing
@@ -181,8 +179,6 @@ def consume_wav_files(path, stop, args, reader, model):
 
 
 def extract_features(args, reader):
-    #save_path = osp.join(args.save_dir, args.split)
-    #npaa = create_files(args, save_path)
 
     generator, num = get_iterator(args, reader)
     iterator = generator()
@@ -236,10 +232,11 @@ def get_overlapping_features(features, shift):
     return torch.stack(lst), rest
 
 def main():
-    input_mic = False
-    with_mp4 = True 
-    ##### Our variables
 
+    input_mic = False
+    with_mp4 = True
+    furhat_virtual = True 
+    ##### Our variables
     # Set the parameters of the audio recording
     CHUNK = 1000
     FORMAT = pyaudio.paInt16
@@ -247,7 +244,6 @@ def main():
     RATE = 16000
     RECORD_SECONDS = 1
 
-    #OUT_PATH = "C:/Users/VCA/Desktop/Elec491/recording_test/"
     IN_PATH = "/home/ozkan/Desktop/ELEC491/wavs/"
     OUT_PATH = "/home/ozkan/Desktop/ELEC491/recording_test/"
     MODEL_PATH = "/home/ozkan/Desktop/ELEC491/model_state_with_5_1.pt"
@@ -258,6 +254,12 @@ def main():
     args = parser.parse_args()
 
     os.makedirs(args.save_dir, exist_ok=True)
+    if furhat_virtual:
+        furhat = FurhatRemoteAPI("localhost")
+    else:
+        furhat = FurhatRemoteAPI("192.168.137.1")
+
+    furhat.gesture(name="CloseEyes")
 
     #Initially loading w2v model
     reader = Wav2VecFeatureReader(args.checkpoint, args.layer)
@@ -266,6 +268,11 @@ def main():
     model.load_state_dict(torch.load(MODEL_PATH)) # Loading model to cpu or gpu
     #model.to('cpu') ######
     model.eval()
+
+    
+
+    user_input = input("Press enter to continue: ")
+    furhat.gesture(name="OpenEyes")
 
     # Create a PyAudio object
     p = pyaudio.PyAudio()
@@ -296,7 +303,7 @@ def main():
     print("Recording...")
 
     # Start the consumer thread
-    consumer_thread = threading.Thread(target=consume_wav_files, args=(OUT_PATH, lambda : STOP_THREADS, args, reader, model))
+    consumer_thread = threading.Thread(target=consume_wav_files, args=(OUT_PATH, lambda : STOP_THREADS, args, reader, model, furhat))
     consumer_thread.start()
 
     # Start recording in a loop
@@ -322,7 +329,9 @@ def main():
 
                 wav_id += 1
                 print(f'Recording duration: {wav_id * RECORD_SECONDS}')
+
             else:
+                
                 # Record n-second audio
                 for file in os.listdir(IN_PATH):
                     if not file.endswith('.wav'): continue
@@ -337,18 +346,20 @@ def main():
                         frame_per_recording = RECORD_SECONDS * RATE * sample_width
 
                     print("number of iterations:", num_frames // frame_per_recording)
-                    play_video(f'{MP4_PATH}{file[:-4]}.mp4')
+                    if with_mp4:
+                        try:
+                            play_video(f'{MP4_PATH}{file[:-4]}.mp4')
+                        except:
+                            print("No mp4 file found")
+                            continue
                     for iter in range(int(num_frames // frame_per_recording)):
-
-                        #Dummy loop
-                        #for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
-                            #dummy = stream.read(CHUNK)
-                        time.sleep(RECORD_SECONDS)
 
                         start = iter * frame_per_recording
                         end = (iter + 1) * frame_per_recording
-                        #print("start:", start, "end:", end)
-                        #stream.write(frames[int(start):int(end)])
+                        if with_mp4:    
+                            time.sleep(RECORD_SECONDS)
+                        else:
+                            stream.write(frames[int(start):int(end)])    
 
                         formatted_id = "{:06d}".format(wav_id) # 5 --> 000005
                         file_name = f'{OUT_PATH}wav_audio_{formatted_id}.wav'
