@@ -236,7 +236,8 @@ def get_overlapping_features(features, shift):
     return torch.stack(lst), rest
 
 def main():
-    input_mic = False 
+    input_mic = False
+    with_mp4 = True 
     ##### Our variables
 
     # Set the parameters of the audio recording
@@ -272,6 +273,13 @@ def main():
     # Open a stream for audio recording
     if input_mic:
         print("Input type: microphone")
+        stream = p.open(format=FORMAT,
+                        channels=CHANNELS,
+                        rate=RATE,
+                        input=True,
+                        frames_per_buffer=CHUNK)
+    elif with_mp4:
+        print("Input type: mp4 file")
         stream = p.open(format=FORMAT,
                         channels=CHANNELS,
                         rate=RATE,
@@ -329,17 +337,18 @@ def main():
                         frame_per_recording = RECORD_SECONDS * RATE * sample_width
 
                     print("number of iterations:", num_frames // frame_per_recording)
-                    
+                    play_video(f'{MP4_PATH}{file[:-4]}.mp4')
                     for iter in range(int(num_frames // frame_per_recording)):
 
-                        # Dummy loop
-                        # for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
-                        #     dummy = stream.read(CHUNK)
+                        #Dummy loop
+                        #for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+                            #dummy = stream.read(CHUNK)
+                        time.sleep(RECORD_SECONDS)
 
                         start = iter * frame_per_recording
                         end = (iter + 1) * frame_per_recording
                         #print("start:", start, "end:", end)
-                        stream.write(frames[int(start):int(end)])
+                        #stream.write(frames[int(start):int(end)])
 
                         formatted_id = "{:06d}".format(wav_id) # 5 --> 000005
                         file_name = f'{OUT_PATH}wav_audio_{formatted_id}.wav'
